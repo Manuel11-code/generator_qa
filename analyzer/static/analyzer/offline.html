@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6366f1">
+  <title>Sin conexión – QA Generator</title>
+  <link rel="icon" type="image/png" href="/static/analyzer/icons/icon-192x192.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #121212;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #1e1e2e;
+      border: 1px solid #6366f133;
+      border-radius: 1.5rem;
+      padding: 3rem 2rem;
+      max-width: 480px;
+      width: 100%;
+    }
+    img { width: 80px; height: 80px; border-radius: 1.25rem; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #818cf8; margin-bottom: 0.75rem; }
+    p  { color: #94a3b8; line-height: 1.6; margin-bottom: 1.5rem; }
+    button {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border: none;
+      border-radius: 0.75rem;
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/static/analyzer/icons/icon-192x192.png" alt="">
+    <h1>Sin conexión</h1>
+    <p>No hay conexión a Internet. Las páginas que visitaste antes (historial, detalles) siguen disponibles desde la caché.</p>
+    <button onclick="location.reload()">Reintentar</button>
+  </div>
+  <script>window.addEventListener('online', function () { location.reload(); });</script>
+</body>
+</html>

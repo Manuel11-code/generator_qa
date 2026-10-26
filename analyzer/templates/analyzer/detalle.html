@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle - QA Generator</title>
+</head>
+<body>
+    {% extends 'analyzer/base.html' %}
+    {% block content %}
+
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Detalle del Análisis</h2>
+        <p class="text-gray-500 mt-1">📅 {{ analisis.fecha|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+            <h3 class="font-semibold text-gray-800 mb-3">📄 Código analizado
+                <span class="ml-2 text-xs font-medium px-2 py-1 rounded-full
+                    {% if analisis.area == 'finanzas' %}bg-indigo-100 text-indigo-600
+                    {% elif analisis.area == 'salud' %}bg-green-100 text-green-600
+                    {% else %}bg-purple-100 text-purple-600{% endif %}">
+                    {% if analisis.area == 'finanzas' %}💰
+                    {% elif analisis.area == 'salud' %}🏥
+                    {% else %}💻{% endif %}
+                    {{ analisis.area|capfirst }}
+                </span>
+            </h3>
+            <pre class="bg-gray-50 rounded-xl p-4 text-sm font-mono overflow-auto max-h-80 text-gray-700">{{ analisis.codigo_original }}</pre>
+        </div>
+
+        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+            <h3 class="font-semibold text-gray-800 mb-3">🤖 Análisis de la IA</h3>
+            <div class="bg-blue-50 rounded-xl p-4 text-sm text-gray-700 overflow-auto max-h-80 whitespace-pre-wrap">{{ analisis.resultado }}</div>
+        </div>
+    </div>
+    <div class="flex gap-4">
+        <a href="{% url 'descargar_pdf' analisis.id %}"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl transition">
+            📄 Descargar PDF
+        </a>
+        <a href="{% url 'historial' %}"
+            class="bg-white border border-gray-300 hover:border-indigo-400 text-gray-700 font-semibold px-6 py-2.5 rounded-xl transition">
+            ← Volver al Historial
+        </a>
+    </div>
+
+    {% endblock %}
+</body>
+</html>

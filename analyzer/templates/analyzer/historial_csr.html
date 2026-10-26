@@ -1,0 +1,84 @@
+{% extends 'analyzer/base.html' %}
+{# Versión CSR del historial: el servidor manda solo el "cascarón"; el navegador #}
+{# descarga el JS, pide /api/historial/ y arma la lista. Misma pantalla que la SSR. #}
+{% block html_attrs %}data-render="CSR"{% endblock %}
+{% block title %}Historial (CSR) – QA Generator{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Tu Historial 📋</h2>
+    <p class="text-gray-500 mt-1">Todos tus análisis anteriores</p>
+</div>
+
+<div id="historial" class="space-y-4 pb-20" aria-busy="true">
+    <p class="text-gray-400">Cargando…</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% url 'historial' as otra_url %}
+{% include 'analyzer/_metricas.html' with otra_texto='Ver versión SSR' %}
+<script>
+(function () {
+  'use strict';
+
+  var AREAS = {
+    finanzas:   { icono: '💰', clases: 'bg-indigo-100 text-indigo-600' },
+    salud:      { icono: '🏥', clases: 'bg-green-100 text-green-600' },
+    tecnologia: { icono: '💻', clases: 'bg-purple-100 text-purple-600' },
+  };
+
+  // Crea un elemento con clases y texto (textContent: sin riesgo de XSS).
+  function el(tag, clases, texto) {
+    var e = document.createElement(tag);
+    if (clases) e.className = clases;
+    if (texto != null) e.textContent = texto;
+    return e;
+  }
+
+  function tarjeta(a) {
+    var area = AREAS[a.area] || AREAS.tecnologia;
+    var card = el('div', 'bg-white border border-gray-200 rounded-2xl shadow-sm p-6 hover:border-indigo-300 transition');
+    var fila = el('div', 'flex justify-between items-start');
+    var info = el('div');
+    info.appendChild(el('span', 'text-xs font-medium px-2 py-1 rounded-full ' + area.clases,
+      area.icono + ' ' + a.area.charAt(0).toUpperCase() + a.area.slice(1)));
+    info.appendChild(el('p', 'text-gray-500 text-sm mt-2', '📅 ' + a.fecha));
+    info.appendChild(el('p', 'text-gray-700 mt-2 font-mono text-sm truncate max-w-lg', a.codigo));
+    var link = el('a', 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-medium px-4 py-2 rounded-xl transition text-sm', 'Ver detalle →');
+    link.href = a.url;
+    fila.appendChild(info);
+    fila.appendChild(link);
+    card.appendChild(fila);
+    return card;
+  }
+
+  function vacio() {
+    var box = el('div', 'bg-white border border-gray-200 rounded-2xl shadow-sm p-12 text-center');
+    box.appendChild(el('div', 'text-5xl mb-4', '🔍'));
+    box.appendChild(el('h3', 'text-xl font-semibold text-gray-800', 'Aún no tienes análisis'));
+    box.appendChild(el('p', 'text-gray-500 mt-2', '¡Analiza tu primer código ahora!'));
+    var a = el('a', 'inline-block mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl transition', 'Comenzar →');
+    a.href = '{% url "analizar" %}';
+    box.appendChild(a);
+    return box;
+  }
+
+  var cont = document.getElementById('historial');
+  fetch('{% url "api_historial" %}', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (datos) {
+      cont.textContent = '';
+      if (!datos.analisis.length) cont.appendChild(vacio());
+      datos.analisis.forEach(function (a) { cont.appendChild(tarjeta(a)); });
+      cont.removeAttribute('aria-busy');
+      QAMetricas.contenidoListo();
+    })
+    .catch(function () {
+      cont.textContent = '';
+      cont.appendChild(el('p', 'p-4 rounded-lg bg-red-50 text-red-600 border border-red-200', 'No se pudo cargar el historial.'));
+    });
+})();
+</script>
+{% endblock %}

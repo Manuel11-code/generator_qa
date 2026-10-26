@@ -1,0 +1,53 @@
+{
+  "id": "/",
+  "name": "QA Generator",
+  "short_name": "QA Generator",
+  "description": "Analiza tu código con inteligencia artificial y obtén problemas, nivel de riesgo, sugerencias y pruebas.",
+  "start_url": "/dashboard/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#121212",
+  "theme_color": "#6366f1",
+  "lang": "es-MX",
+  "dir": "ltr",
+  "categories": ["productivity", "developer", "utilities"],
+  "icons": [
+    {
+      "src": "/static/analyzer/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/analyzer/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/analyzer/icons/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Analizar código",
+      "short_name": "Analizar",
+      "description": "Analiza un nuevo fragmento de código",
+      "url": "/analizar/",
+      "icons": [{ "src": "/static/analyzer/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Historial",
+      "short_name": "Historial",
+      "description": "Ver historial de análisis",
+      "url": "/historial/",
+      "icons": [{ "src": "/static/analyzer/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

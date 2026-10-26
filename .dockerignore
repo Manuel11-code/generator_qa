@@ -1,0 +1,69 @@
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ─── Entornos virtuales ────────────────────────────────
+env/
+venv/
+.venv/
+ENV/
+
+# ─── Base de datos local ───────────────────────────────
+db.sqlite3
+*.db
+
+# ─── Archivos estáticos generados ─────────────────────
+# Nginx los sirve desde el volumen; no copiarlos al build
+staticfiles/
+media/
+
+# ─── Control de versiones ─────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ─── Editores e IDEs ──────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Sistemas operativos ──────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Secretos y configuración local ───────────────────
+.env
+*.env.local
+*.env.*.local
+
+# ─── Documentación y tests (no necesarios en imagen) ──
+docs/
+*.md
+tests/
+coverage/
+.coverage
+htmlcov/
+
+# ─── Docker (evitar incluir artefactos de compose) ────
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# ─── Node (por si hay assets frontend) ────────────────
+node_modules/
+npm-debug.log*
+
+# ─── Carpetas de nginx/certbot del proyecto ───────────
+# No deben copiarse al contexto del servicio "web"
+nginx/
+certbot/

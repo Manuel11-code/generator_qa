@@ -1,0 +1,83 @@
+services:
+
+  # ============================================
+  # Base de datos PostgreSQL
+  # ============================================
+  db:
+    image: postgres:16-alpine
+    container_name: qa_generator_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Volumen nombrado: los datos de la BD persisten aunque
+      # borres y recrees el contenedor.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qa_generator_net
+
+  # ============================================
+  # Aplicación Django (Gunicorn)
+  # ============================================
+  web:
+    build: .
+    container_name: qa_generator_web
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Compartimos los estáticos generados con el contenedor de nginx
+      - static_volume:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - qa_generator_net
+    # No exponemos el puerto 8000 al exterior directamente:
+    # todo el tráfico público entra por Nginx, no por Django.
+
+  # ============================================
+  # Nginx: proxy reverso + servidor de estáticos
+  # ============================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: qa_generator_nginx
+    restart: unless-stopped
+    ports:
+    - "8080:80"
+    - "8443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - static_volume:/app/staticfiles:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - web
+    networks:
+      - qa_generator_net
+
+  # ============================================
+  # Certbot: emite/renueva certificados HTTPS (Let's Encrypt)
+  # ============================================
+  certbot:
+    image: certbot/certbot
+    container_name: qa_generator_certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  qa_generator_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_volume:

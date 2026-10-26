@@ -1,0 +1,45 @@
+{% extends 'analyzer/base.html' %}
+{% block content %}
+
+<div class="mb-8">
+    <h2 class="text-2xl font-bold text-gray-800">Bienvenido, {{ user.username }} 👋</h2>
+    <p class="text-gray-500 mt-1">¿Qué quieres hacer hoy?</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a href="{% url 'analizar' %}"
+        class="bg-white border border-[#DADFEE] rounded-2xl p-6 hover:border-[#2E3354] transition group">
+        <div class="text-4xl mb-4">🔍</div>
+        <h3 class="text-xl font-semibold text-gray-800 group-hover:text-[#2E3354]">Analizar Código</h3>
+        <p class="text-gray-500 mt-2">Pega tu código y la IA lo analizará buscando vulnerabilidades, errores y malas prácticas.</p>
+        <span class="inline-block mt-4 text-[#2E3354] font-medium">Comenzar análisis →</span>
+    </a>
+
+    <a href="{% url 'historial' %}"
+        class="bg-white border border-[#DADFEE] rounded-2xl p-6 hover:border-[#2E3354] transition group">
+        <div class="text-4xl mb-4">📋</div>
+        <h3 class="text-xl font-semibold text-gray-800 group-hover:text-[#2E3354]">Ver Historial</h3>
+        <p class="text-gray-500 mt-2">Revisa todos tus análisis anteriores y descarga los reportes generados.</p>
+        <span class="inline-block mt-4 text-[#2E3354] font-medium">Ver historial →</span>
+    </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+    <div class="bg-[#EDEFF7] rounded-2xl p-6">
+        <div class="text-3xl mb-2">💰</div>
+        <h4 class="font-semibold text-gray-800">Finanzas</h4>
+        <p class="text-gray-500 text-sm mt-1">Pagos, transferencias, cálculos monetarios</p>
+    </div>
+    <div class="bg-[#E3E6F1] rounded-2xl p-6">
+        <div class="text-3xl mb-2">🏥</div>
+        <h4 class="font-semibold text-gray-800">Salud Digital</h4>
+        <p class="text-gray-500 text-sm mt-1">Expedientes, citas, cálculos de dosis</p>
+    </div>
+    <div class="bg-[#D8DCED] rounded-2xl p-6">
+        <div class="text-3xl mb-2">💻</div>
+        <h4 class="font-semibold text-gray-800">Tecnología</h4>
+        <p class="text-gray-500 text-sm mt-1">APIs, autenticación, bases de datos</p>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends 'analyzer/base.html' %}
+{# Práctica 1.3 – Compara la primera carga del historial en versión CSR y SSR. #}
+{% block title %}CSR vs SSR – QA Generator{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">CSR vs SSR ⏱️</h2>
+    <p class="text-gray-500 mt-1">
+        Carga la misma pantalla (tu historial) varias veces en cada versión y promedia los tiempos de primera carga.
+    </p>
+</div>
+
+<div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 mb-6">
+    <div class="flex flex-wrap items-center gap-4">
+        <label class="text-gray-600 font-medium">Repeticiones por versión
+            <input id="rondas" type="number" min="1" max="20" value="5"
+                class="ml-2 w-20 border border-gray-300 rounded-lg px-2 py-1">
+        </label>
+        <button id="iniciar" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-xl transition">
+            Medir
+        </button>
+        <span id="estado" class="text-gray-500 text-sm"></span>
+    </div>
+</div>
+
+<div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto mb-6">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 text-left">
+            <tr>
+                <th class="px-4 py-3 font-medium">Métrica (promedio)</th>
+                <th class="px-4 py-3 font-medium">CSR <span class="font-normal">/historial/csr/</span></th>
+                <th class="px-4 py-3 font-medium">SSR <span class="font-normal">/historial/</span></th>
+                <th class="px-4 py-3 font-medium">Diferencia</th>
+            </tr>
+        </thead>
+        <tbody id="tabla" class="divide-y divide-gray-100 text-gray-800">
+            <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Pulsa “Medir” para empezar.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<p class="text-gray-500 text-sm mb-2">Vista previa de cada carga:</p>
+<iframe id="marco" title="Vista medida" class="w-full h-96 bg-white border border-gray-200 rounded-2xl"></iframe>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  var URLS = { CSR: '{% url "historial_csr" %}', SSR: '{% url "historial" %}' };
+  var marco = document.getElementById('marco');
+  var estado = document.getElementById('estado');
+  var tabla = document.getElementById('tabla');
+  var resultados = { CSR: [], SSR: [] };
+  var html = { CSR: null, SSR: null };
+  var esperando = null;
+
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.tipo !== 'metricas-render') return;
+    if (esperando) { var fn = esperando; esperando = null; fn(e.data.datos); }
+  });
+
+  function cargar(modo) {
+    return new Promise(function (resolve) {
+      var limite = setTimeout(function () { esperando = null; resolve(null); }, 15000);
+      esperando = function (d) { clearTimeout(limite); resolve(d); };
+      // Parámetro único: evita la caché HTTP entre rondas (y el SW no guarda estas cargas).
+      marco.src = URLS[modo] + '?medir=' + Date.now();
+    });
+  }
+
+  // ¿El HTML que manda el servidor ya trae el contenido? (lo que ve un buscador)
+  function analizarHTML(modo) {
+    return fetch(URLS[modo], { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        html[modo] = {
+          kb: Math.round(new Blob([t]).size / 102.4) / 10,
+          items: (t.match(/href="\/analisis\/\d+\//g) || []).length,
+        };
+      });
+  }
+
+  function prom(lista, campo) {
+    var v = lista.filter(Boolean).map(function (d) { return d[campo]; });
+    return v.length ? Math.round(v.reduce(function (a, b) { return a + b; }, 0) / v.length) : null;
+  }
+
+  // menorEsMejor: true/false indica quién gana; null = solo informativo.
+  function fila(nombre, csr, ssr, unidad, menorEsMejor) {
+    var u = unidad ? ' ' + unidad : '';
+    var dif = '';
+    if (menorEsMejor != null && csr != null && ssr != null) {
+      var d = csr - ssr;
+      var gana = d === 0 ? 'Empate' : ((d > 0) === menorEsMejor ? 'SSR' : 'CSR');
+      dif = (d > 0 ? '+' : '') + Math.round(d * 10) / 10 + u + ' en CSR · gana ' + gana;
+    }
+    var tr = document.createElement('tr');
+    [nombre, csr == null ? '—' : csr + u, ssr == null ? '—' : ssr + u, dif]
+      .forEach(function (txt, i) {
+        var td = document.createElement('td');
+        td.className = 'px-4 py-3' + (i === 0 ? ' font-medium' : '');
+        td.textContent = txt;
+        tr.appendChild(td);
+      });
+    return tr;
+  }
+
+  function pintar() {
+    tabla.textContent = '';
+    var c = resultados.CSR, s = resultados.SSR;
+    tabla.appendChild(fila('TTFB (primer byte)', prom(c, 'ttfb'), prom(s, 'ttfb'), 'ms', true));
+    tabla.appendChild(fila('FCP (primer pintado)', prom(c, 'fcp'), prom(s, 'fcp'), 'ms', true));
+    tabla.appendChild(fila('Contenido visible', prom(c, 'contenido'), prom(s, 'contenido'), 'ms', true));
+    tabla.appendChild(fila('Tamaño del HTML inicial', html.CSR && html.CSR.kb, html.SSR && html.SSR.kb, 'KB', true));
+    tabla.appendChild(fila('Análisis presentes en el HTML inicial (SEO)', html.CSR && html.CSR.items, html.SSR && html.SSR.items, '', false));
+    tabla.appendChild(fila('Muestras válidas', c.filter(Boolean).length, s.filter(Boolean).length, '', null));
+  }
+
+  document.getElementById('iniciar').addEventListener('click', function () {
+    var boton = this;
+    var n = Math.max(1, Math.min(20, parseInt(document.getElementById('rondas').value, 10) || 5));
+    resultados = { CSR: [], SSR: [] };
+    boton.disabled = true;
+
+    // Se alternan CSR y SSR para que ambas versiones corran en condiciones parecidas.
+    var orden = [];
+    for (var i = 0; i < n; i++) orden.push('CSR', 'SSR');
+
+    Promise.all([analizarHTML('CSR'), analizarHTML('SSR')]).then(function () {
+      return orden.reduce(function (p, modo, i) {
+        return p.then(function () {
+          estado.textContent = 'Carga ' + (i + 1) + ' de ' + orden.length + ' (' + modo + ')…';
+          return cargar(modo).then(function (d) { resultados[modo].push(d); pintar(); });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      estado.textContent = 'Listo ✔';
+      boton.disabled = false;
+      pintar();
+    });
+  });
+})();
+</script>
+{% endblock %}

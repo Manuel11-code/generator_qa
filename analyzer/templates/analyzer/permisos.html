@@ -1,0 +1,305 @@
+{% extends 'analyzer/base.html' %}
+{# Práctica 2.1 – Notificaciones push y acceso a una característica nativa (geolocalización). #}
+{% block title %}Permisos – QA Generator{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Notificaciones y permisos 🔐</h2>
+    <p class="text-gray-500 mt-1">Activa los avisos de QA Generator y prueba el acceso a funciones del dispositivo. Tú decides qué permitir.</p>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6 pb-8">
+
+    <!-- ── Notificaciones push ─────────────────────────────────────────── -->
+    <section class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 flex flex-col gap-4">
+        <div class="flex justify-between items-start gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800">🔔 Notificaciones push</h3>
+                <p class="text-gray-500 text-sm mt-1">Te avisamos cuando un análisis termina, aunque hayas cerrado la app.</p>
+            </div>
+            <span id="push-estado" class="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">…</span>
+        </div>
+
+        <p id="push-mensaje" class="text-sm text-gray-600"></p>
+
+        <div class="flex flex-wrap gap-2 mt-auto">
+            <button id="push-activar" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold px-4 py-2 rounded-xl transition" disabled>
+                Activar notificaciones
+            </button>
+            <button id="push-prueba" class="bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 text-indigo-600 font-medium px-4 py-2 rounded-xl transition" disabled>
+                Enviar push de prueba
+            </button>
+            <button id="push-desactivar" class="bg-red-50 hover:bg-red-100 disabled:opacity-40 text-red-600 font-medium px-4 py-2 rounded-xl transition" disabled>
+                Desactivar
+            </button>
+        </div>
+        <p class="text-xs text-gray-400">
+            Dispositivos suscritos en tu cuenta: <span id="push-dispositivos">{{ dispositivos }}</span>.
+            En iPhone/iPad las notificaciones solo funcionan con la app instalada en la pantalla de inicio.
+        </p>
+    </section>
+
+    <!-- ── Geolocalización ─────────────────────────────────────────────── -->
+    <section class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 flex flex-col gap-4">
+        <div class="flex justify-between items-start gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800">📍 Ubicación</h3>
+                <p class="text-gray-500 text-sm mt-1">Acceso al GPS / ubicación del dispositivo. Solo se usa en esta pantalla y no se envía al servidor.</p>
+            </div>
+            <span id="geo-estado" class="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">…</span>
+        </div>
+
+        <div id="geo-resultado" class="text-sm text-gray-600"></div>
+
+        <div class="flex flex-wrap gap-2 mt-auto">
+            <button id="geo-obtener" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold px-4 py-2 rounded-xl transition">
+                Obtener mi ubicación
+            </button>
+        </div>
+    </section>
+</div>
+
+<!-- ── Registro de eventos: deja ver qué pasó al conceder o negar ───────── -->
+<section class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-3">🧾 Registro de eventos</h3>
+    <ol id="registro" class="text-sm font-mono text-gray-600 space-y-1 max-h-64 overflow-y-auto"></ol>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  var VAPID_PUBLIC_KEY = '{{ vapid_public_key }}';  // base64url: solo A-Z a-z 0-9 - _
+  var CSRF = '{{ csrf_token }}';
+  var URLS = {
+    suscribir: '{% url "push_suscribir" %}',
+    desuscribir: '{% url "push_desuscribir" %}',
+    prueba: '{% url "push_prueba" %}',
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ── Utilidades ─────────────────────────────────────────────────────────
+
+  function log(texto) {
+    var li = document.createElement('li');
+    li.textContent = new Date().toLocaleTimeString() + '  ' + texto;
+    $('registro').prepend(li);
+  }
+
+  var TONOS = {
+    ok: 'bg-green-100 text-green-700',
+    no: 'bg-red-100 text-red-700',
+    pendiente: 'bg-amber-100 text-amber-700',
+    gris: 'bg-gray-100 text-gray-600',
+  };
+  function badge(id, texto, tono) {
+    $(id).textContent = texto;
+    $(id).className = 'text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ' + TONOS[tono];
+  }
+
+  function post(url, datos) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify(datos || {}),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { j.status = r.status; return j; });
+    });
+  }
+
+  // La llave pública VAPID viene en base64url; pushManager la quiere como bytes.
+  function llaveABytes(b64) {
+    var relleno = '='.repeat((4 - b64.length % 4) % 4);
+    var bin = atob((b64 + relleno).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(bin, function (c) { return c.charCodeAt(0); });
+  }
+
+  // ── Notificaciones push ────────────────────────────────────────────────
+
+  var soportaPush = window.isSecureContext && 'serviceWorker' in navigator &&
+    'PushManager' in window && 'Notification' in window;
+
+  // serviceWorker.ready nunca se resuelve si el SW no logra instalarse:
+  // se limita la espera para poder avisar en lugar de quedarse en "…".
+  function swListo() {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (_, rechazar) {
+        setTimeout(function () { rechazar(new Error('El Service Worker no está activo')); }, 8000);
+      }),
+    ]);
+  }
+
+  function suscripcionActual() {
+    return swListo().then(function (reg) { return reg.pushManager.getSubscription(); });
+  }
+
+  function pintarPush() {
+    if (!soportaPush) {
+      badge('push-estado', 'No disponible', 'gris');
+      $('push-mensaje').textContent = window.isSecureContext
+        ? 'Este navegador no soporta notificaciones push.'
+        : 'Las notificaciones push requieren HTTPS (o localhost).';
+      return Promise.resolve();
+    }
+    if (!VAPID_PUBLIC_KEY) {
+      badge('push-estado', 'Sin configurar', 'gris');
+      $('push-mensaje').textContent = 'Falta VAPID_PUBLIC_KEY en el .env del servidor (python manage.py generar_vapid).';
+      return Promise.resolve();
+    }
+
+    var permiso = Notification.permission; // 'default' | 'granted' | 'denied'
+    return suscripcionActual().then(function (sub) {
+      $('push-activar').disabled = permiso === 'denied' || !!sub;
+      $('push-prueba').disabled = !sub;
+      $('push-desactivar').disabled = !sub;
+
+      if (permiso === 'denied') {
+        badge('push-estado', 'Bloqueado', 'no');
+        $('push-mensaje').textContent = 'Bloqueaste las notificaciones. La app sigue funcionando, pero no recibirás avisos. ' +
+          'Para activarlas: clic en el candado de la barra de direcciones → Notificaciones → Permitir, y recarga.';
+      } else if (sub) {
+        badge('push-estado', 'Activadas', 'ok');
+        $('push-mensaje').textContent = 'Este navegador está suscrito. Prueba enviar una notificación.';
+      } else if (permiso === 'granted') {
+        badge('push-estado', 'Permitido · sin suscripción', 'pendiente');
+        $('push-mensaje').textContent = 'Tienes el permiso, pero este navegador aún no está suscrito.';
+      } else {
+        badge('push-estado', 'Sin decidir', 'pendiente');
+        $('push-mensaje').textContent = 'Al pulsar “Activar”, el navegador te preguntará si permites las notificaciones.';
+      }
+    }).catch(function (e) {
+      badge('push-estado', 'No disponible', 'gris');
+      $('push-mensaje').textContent = e.message + '. Recarga la página; si sigue igual, revisa la consola (F12).';
+      log('Error: ' + e.message);
+    });
+  }
+
+  $('push-activar').addEventListener('click', function () {
+    log('Solicitando permiso de notificaciones…');
+    // 1) Pedir permiso (solo desde un clic del usuario)
+    Notification.requestPermission().then(function (permiso) {
+      log('Respuesta del usuario: ' + permiso);
+      if (permiso !== 'granted') {
+        log(permiso === 'denied'
+          ? 'Permiso NEGADO → no se crea suscripción; la app continúa sin notificaciones.'
+          : 'El usuario cerró el aviso sin decidir → se podrá preguntar de nuevo.');
+        return pintarPush();
+      }
+      // 2) Suscribirse al servicio push del navegador con la llave VAPID
+      return swListo().then(function (reg) {
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: llaveABytes(VAPID_PUBLIC_KEY) });
+      }).then(function (sub) {
+        log('Suscripción creada en ' + new URL(sub.endpoint).host);
+        // 3) Guardar la suscripción en el servidor (Django)
+        return post(URLS.suscribir, sub.toJSON());
+      }).then(function (r) {
+        if (!r.ok) throw new Error(r.error || r.status);
+        $('push-dispositivos').textContent = r.dispositivos;
+        log('Suscripción guardada en el servidor ✔');
+        return pintarPush();
+      });
+    }).catch(function (e) {
+      log('Error al activar: ' + e.message);
+      pintarPush();
+    });
+  });
+
+  $('push-prueba').addEventListener('click', function () {
+    log('Pidiendo al servidor una notificación de prueba…');
+    post(URLS.prueba).then(function (r) {
+      if (r.ok) log('Servidor envió ' + r.enviadas + ' push. Debe aparecer la notificación del sistema.');
+      else log('No se pudo enviar: ' + (r.error || r.status));
+    });
+  });
+
+  $('push-desactivar').addEventListener('click', function () {
+    suscripcionActual().then(function (sub) {
+      if (!sub) return;
+      var endpoint = sub.endpoint;
+      return sub.unsubscribe().then(function () { return post(URLS.desuscribir, { endpoint: endpoint }); })
+        .then(function (r) {
+          $('push-dispositivos').textContent = r.dispositivos;
+          log('Notificaciones desactivadas en este navegador.');
+        });
+    }).then(pintarPush);
+  });
+
+  // ── Geolocalización ────────────────────────────────────────────────────
+
+  var ERRORES_GEO = {
+    1: 'Permiso NEGADO. No se puede leer la ubicación; el resto de la app funciona igual. ' +
+       'Para permitirla: candado de la barra de direcciones → Ubicación → Permitir.',
+    2: 'No se pudo determinar la ubicación (sin GPS, Wi-Fi o red).',
+    3: 'Se agotó el tiempo esperando la ubicación. Intenta de nuevo.',
+  };
+
+  function pintarGeo(estado) {
+    var mapa = { granted: ['Permitido', 'ok'], denied: ['Bloqueado', 'no'], prompt: ['Sin decidir', 'pendiente'] };
+    var m = mapa[estado] || ['Desconocido', 'gris'];
+    badge('geo-estado', m[0], m[1]);
+  }
+
+  if (!('geolocation' in navigator)) {
+    badge('geo-estado', 'No disponible', 'gris');
+    $('geo-obtener').disabled = true;
+    $('geo-resultado').textContent = 'Este navegador no tiene acceso a la ubicación.';
+  }
+
+  $('geo-obtener').addEventListener('click', function () {
+    var boton = this;
+    boton.disabled = true;
+    $('geo-resultado').textContent = 'Esperando permiso / ubicación…';
+    log('Solicitando ubicación (navigator.geolocation)…');
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var c = pos.coords;
+      var lat = c.latitude.toFixed(5), lon = c.longitude.toFixed(5);
+      $('geo-resultado').innerHTML = '';
+      [['Latitud', lat], ['Longitud', lon], ['Precisión', '± ' + Math.round(c.accuracy) + ' m']].forEach(function (f) {
+        var p = document.createElement('p');
+        p.innerHTML = '<span class="text-gray-400">' + f[0] + ':</span> ';
+        p.appendChild(document.createTextNode(f[1]));
+        $('geo-resultado').appendChild(p);
+      });
+      var a = document.createElement('a');
+      a.href = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lon + '#map=16/' + lat + '/' + lon;
+      a.target = '_blank'; a.rel = 'noopener';
+      a.className = 'inline-block mt-2 text-indigo-600 underline';
+      a.textContent = 'Ver en el mapa →';
+      $('geo-resultado').appendChild(a);
+      log('Permiso CONCEDIDO → ubicación ' + lat + ', ' + lon + ' (±' + Math.round(c.accuracy) + ' m)');
+      pintarGeo('granted');
+      boton.disabled = false;
+    }, function (err) {
+      $('geo-resultado').textContent = ERRORES_GEO[err.code] || err.message;
+      log('Error de ubicación (código ' + err.code + '): ' + (ERRORES_GEO[err.code] || err.message));
+      if (err.code === 1) pintarGeo('denied');
+      boton.disabled = false;
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  });
+
+  // ── Estado inicial y cambios hechos desde la configuración del navegador ──
+
+  if (navigator.permissions) {
+    [['notifications', pintarPush], ['geolocation', null]].forEach(function (p) {
+      navigator.permissions.query({ name: p[0] }).then(function (st) {
+        if (p[0] === 'geolocation') pintarGeo(st.state);
+        st.onchange = function () {
+          log('El permiso de ' + p[0] + ' cambió a: ' + st.state);
+          if (p[0] === 'geolocation') pintarGeo(st.state); else pintarPush();
+        };
+      }).catch(function () { /* el navegador no expone este permiso */ });
+    });
+  }
+
+  pintarPush();
+  log('Página lista. Notificaciones: ' + (soportaPush ? Notification.permission : 'no soportadas') + '.');
+})();
+</script>
+{% endblock %}

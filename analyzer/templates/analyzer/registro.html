@@ -1,0 +1,45 @@
+{% extends 'analyzer/base.html' %}
+{% block content %}
+
+<div class="min-h-screen flex items-center justify-center -mt-8">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-600">🔍 QA Generator</h1>
+            <p class="text-gray-500 mt-2">Crea tu cuenta</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                <input type="text" name="username" placeholder="Elige un usuario"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" name="email" placeholder="tu@email.com"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                <input type="password" name="password1" placeholder="Crea una contraseña"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña</label>
+                <input type="password" name="password2" placeholder="Repite tu contraseña"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <button type="submit"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition">
+                Crear Cuenta
+            </button>
+        </form>
+
+        <p class="text-center text-gray-500 mt-6">¿Ya tienes cuenta?
+            <a href="{% url 'login' %}" class="text-indigo-600 hover:underline font-medium">Inicia sesión</a>
+        </p>
+    </div>
+</div>
+
+{% endblock %}
