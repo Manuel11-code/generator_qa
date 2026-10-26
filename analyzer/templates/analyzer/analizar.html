@@ -8,7 +8,7 @@
 </div>
 
 <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-    <form method="POST" class="space-y-6">
+    <form method="POST" id="form-analizar" class="space-y-6">
         {% csrf_token %}
 
         <div>
@@ -74,7 +74,8 @@
 <script>
 (function () {
   'use strict';
-  var form = document.querySelector('form[method="POST"]');
+  // Por id: el primer form POST de la página es el botón "Salir" del menú (base.html).
+  var form = document.getElementById('form-analizar');
   var boton = document.getElementById('btn-analizar');
   var aviso = document.getElementById('cargando');
   var mensaje = document.getElementById('cargando-mensaje');
