@@ -55,9 +55,9 @@ coverage/
 htmlcov/
 
 # ─── Docker (evitar incluir artefactos de compose) ────
+# El Dockerfile y .dockerignore NO se excluyen: Render (BuildKit) los lee del
+# contexto de build y falla con "open Dockerfile: no such file or directory".
 docker-compose*.yml
-Dockerfile*
-.dockerignore
 
 # ─── Node (por si hay assets frontend) ────────────────
 node_modules/
