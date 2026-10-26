@@ -1,0 +1,28 @@
+# Secretos
+.env
+*.env
+.env.*
+
+# Entorno virtual
+env/
+venv/
+.venv/
+
+# Base de datos local
+db.sqlite3
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Generados
+staticfiles/
+media/
+
+# Editores / SO / herramientas
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/

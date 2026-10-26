@@ -1,5 +1,6 @@
 import anthropic
 import json
+import logging
 import os
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
@@ -24,6 +25,8 @@ from reportlab.lib.enums import TA_CENTER
 # pyrefly: ignore [missing-import]
 from .models import Analisis, SuscripcionPush
 from .push import enviar_push, push_configurado
+
+logger = logging.getLogger(__name__)
 
 
 # ─── PWA Views ────────────────────────────────────────────────────────────────
@@ -200,7 +203,26 @@ def analizar(request):
         except ValueError as e:
             messages.error(request, str(e))
             return redirect('analizar')
+        except anthropic.AuthenticationError:
+            logger.error('Anthropic rechazó la API key (401)')
+            messages.error(request, 'La API key de Anthropic no es válida. Revisa ANTHROPIC_API_KEY en el .env.')
+            return redirect('analizar')
+        except anthropic.PermissionDeniedError:
+            logger.error('Anthropic: la API key no tiene permiso (403)')
+            messages.error(request, 'La API key de Anthropic no tiene permiso para usar este modelo.')
+            return redirect('analizar')
+        except anthropic.BadRequestError as e:
+            logger.error('Anthropic rechazó la solicitud: %s', e)
+            if 'credit balance' in str(e).lower():
+                messages.error(request, 'La cuenta de Anthropic no tiene saldo. Agrega créditos en console.anthropic.com.')
+            else:
+                messages.error(request, 'La IA rechazó la solicitud. Intenta con otro código.')
+            return redirect('analizar')
+        except anthropic.RateLimitError:
+            messages.error(request, 'Se alcanzó el límite de uso de la IA. Espera un momento e intenta de nuevo.')
+            return redirect('analizar')
         except Exception:
+            logger.exception('Error al llamar a la API de Anthropic')
             messages.error(request, 'Error al conectar con la IA, intenta de nuevo')
             return redirect('analizar')
 

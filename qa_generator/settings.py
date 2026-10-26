@@ -14,8 +14,12 @@ from pathlib import Path
 # pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 import os
+import sys
+from urllib.parse import unquote, urlparse
 
-load_dotenv()
+# override=True: el .env manda. Sin esto, al recargarse runserver el proceso hijo
+# hereda los valores viejos del padre y no ve los cambios del .env (p. ej. una API key nueva).
+load_dotenv(Path(__file__).resolve().parent.parent / '.env', override=True)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,7 +36,29 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+
+# Dominio público que asigna la plataforma de hosting:
+#   Render  → RENDER_EXTERNAL_HOSTNAME (p. ej. qa-generator.onrender.com)
+#   Railway → RAILWAY_PUBLIC_DOMAIN   (p. ej. qa-generator-production.up.railway.app)
+DOMINIO_PUBLICO = (os.getenv('RENDER_EXTERNAL_HOSTNAME') or os.getenv('RAILWAY_PUBLIC_DOMAIN') or '').strip()
+if DOMINIO_PUBLICO and DOMINIO_PUBLICO not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(DOMINIO_PUBLICO)
+
+# Orígenes HTTPS desde los que se aceptan formularios (login, analizar…).
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+if DOMINIO_PUBLICO:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{DOMINIO_PUBLICO}')
+
+# ─── Seguridad en producción (DEBUG=False) ───────────────────────────────────
+if not DEBUG:
+    # El hosting termina el HTTPS en su proxy y reenvía por HTTP con esta cabecera
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Application definition
@@ -49,6 +75,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Sirve /static/ en producción (sin nginx), con compresión y caché
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -82,12 +110,36 @@ WSGI_APPLICATION = 'qa_generator.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # SQLite — configuración local (sin Docker/PostgreSQL)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Con DATABASE_URL en el .env se usa PostgreSQL (Supabase); sin ella, SQLite local.
+# Formato: postgresql://USUARIO:CONTRASEÑA@HOST:PUERTO/BASE
+DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
+# Las pruebas (manage.py test) usan SQLite para no crear bases temporales en Supabase.
+EJECUTANDO_PRUEBAS = sys.argv[1:2] == ['test']
+
+if DATABASE_URL and not EJECUTANDO_PRUEBAS:
+    _db = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _db.path.lstrip('/') or 'postgres',
+            'USER': unquote(_db.username or ''),
+            'PASSWORD': unquote(_db.password or ''),
+            'HOST': _db.hostname,
+            'PORT': _db.port or 5432,
+            # Supabase exige conexión cifrada
+            'OPTIONS': {'sslmode': os.getenv('DB_SSLMODE', 'require')},
+            # Reusar conexiones; el pooler de Supabase (puerto 5432, modo sesión) lo permite
+            'CONN_MAX_AGE': 60,
+            'CONN_HEALTH_CHECKS': True,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -130,6 +182,21 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'analyzer' / 'static',
 ]
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    # Archivos comprimidos (gzip/brotli) generados en collectstatic
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
+
+# Errores a la consola: en Railway aparecen en la pestaña de logs
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'consola': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['consola'], 'level': 'INFO'},
+    'loggers': {'django': {'handlers': ['consola'], 'level': 'INFO', 'propagate': False}},
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field

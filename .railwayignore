@@ -1,0 +1,13 @@
+# No se sube a Railway (secretos, entorno local y archivos generados)
+.env
+*.env
+env/
+venv/
+.venv/
+__pycache__/
+*.pyc
+db.sqlite3
+*.sqlite3
+staticfiles/
+.claude/
+.git/

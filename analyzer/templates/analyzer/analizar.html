@@ -1,12 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    {% extends 'analyzer/base.html' %}
+{% extends 'analyzer/base.html' %}
+{% block title %}Analizar código – QA Generator{% endblock %}
 {% block content %}
 
 <div class="mb-6">
@@ -52,13 +45,77 @@
                 class="w-full border border-gray-300 rounded-xl px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" required></textarea>
         </div>
 
-        <button type="submit"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition text-lg">
-            🤖 Analizar con IA
+        <button type="submit" id="btn-analizar"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-wait text-white font-semibold py-3 rounded-xl transition text-lg flex items-center justify-center gap-3">
+            <svg id="spinner" class="hidden animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span id="btn-texto">🤖 Analizar con IA</span>
         </button>
+
+        <!-- Aviso mientras la IA responde (suele tardar ~30 s) -->
+        <div id="cargando" class="hidden items-center gap-4 bg-indigo-50 border border-indigo-100 rounded-xl p-4" role="status" aria-live="polite">
+            <div class="relative h-10 w-10 shrink-0">
+                <span class="absolute inset-0 rounded-full bg-indigo-400 opacity-40 animate-ping"></span>
+                <span class="relative flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-xl">🤖</span>
+            </div>
+            <div class="flex-1">
+                <p id="cargando-mensaje" class="font-medium text-indigo-700">Enviando tu código a la IA…</p>
+                <p class="text-sm text-indigo-500">Esto suele tardar unos 30 segundos · <span id="cargando-tiempo">0 s</span></p>
+            </div>
+        </div>
     </form>
 </div>
 
 {% endblock %}
-</body>
-</html>
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  var form = document.querySelector('form[method="POST"]');
+  var boton = document.getElementById('btn-analizar');
+  var aviso = document.getElementById('cargando');
+  var mensaje = document.getElementById('cargando-mensaje');
+  var tiempo = document.getElementById('cargando-tiempo');
+  var MENSAJES = [
+    'Enviando tu código a la IA…',
+    'Buscando vulnerabilidades…',
+    'Revisando errores lógicos…',
+    'Evaluando el nivel de riesgo…',
+    'Escribiendo sugerencias y pruebas…',
+    'Ya casi termina…',
+  ];
+  var reloj = null;
+
+  function restaurar() {
+    clearInterval(reloj);
+    boton.disabled = false;
+    document.getElementById('spinner').classList.add('hidden');
+    document.getElementById('btn-texto').textContent = '🤖 Analizar con IA';
+    aviso.classList.add('hidden');
+    aviso.classList.remove('flex');
+  }
+
+  form.addEventListener('submit', function () {
+    // El navegador ya validó los campos requeridos antes de llegar aquí.
+    boton.disabled = true;  // evita enviar dos veces (y pagar dos análisis)
+    document.getElementById('spinner').classList.remove('hidden');
+    document.getElementById('btn-texto').textContent = 'Analizando con IA…';
+    aviso.classList.remove('hidden');
+    aviso.classList.add('flex');
+
+    var inicio = Date.now();
+    reloj = setInterval(function () {
+      var s = Math.floor((Date.now() - inicio) / 1000);
+      tiempo.textContent = s + ' s';
+      mensaje.textContent = MENSAJES[Math.min(Math.floor(s / 6), MENSAJES.length - 1)];
+    }, 1000);
+  });
+
+  // Si el usuario regresa con "Atrás", la página puede venir de la caché con el botón bloqueado.
+  window.addEventListener('pageshow', function (e) { if (e.persisted) restaurar(); });
+})();
+</script>
+{% endblock %}

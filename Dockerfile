@@ -44,4 +44,7 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-CMD ["gunicorn", "qa_generator.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Al arrancar: aplica migraciones (Supabase) y levanta gunicorn.
+# - $PORT lo asigna Railway (8000 si no existe, p. ej. con docker-compose).
+# - --timeout 120: un análisis de la IA tarda ~30-40 s; el límite por defecto (30 s) lo cortaría.
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn qa_generator.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-3} --timeout 120 --access-logfile -"]

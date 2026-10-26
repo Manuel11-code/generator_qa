@@ -1,0 +1,26 @@
+# Blueprint de Render: crea el servicio web a partir del Dockerfile.
+# Los secretos (sync: false) se piden en el panel al crear el servicio; nunca van aquí.
+services:
+  - type: web
+    name: qa-generator
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: WEB_CONCURRENCY      # 2 workers caben en los 512 MB del plan gratis
+        value: "2"
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL         # Supabase, Session pooler (puerto 5432)
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@qa-generator.local
